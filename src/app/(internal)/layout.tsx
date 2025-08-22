@@ -1,4 +1,5 @@
 import Header from "@/components/common/header";
+import EventWrapper from "@/components/EventWrapper";
 
 export default function RootLayout({
   children,
@@ -6,9 +7,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex flex-col space-y-2">
-      <Header />
-      {children}
-    </div>
+    <EventWrapper>
+      <div className="flex flex-col space-y-2">
+        <Header />
+        {children}
+      </div>
+    </EventWrapper>
   );
 }
