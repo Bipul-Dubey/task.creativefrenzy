@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Creative Frenzy - Collaborative Task Board
 
-## Getting Started
+A real-time task and project management tool built with **Next.js, React, Express.js, MongoDB, Tailwind CSS, Shadcn,and Socket.IO**. Supports drag-and-drop columns and tasks, live user presence, and real-time updates across multiple clients.
 
-First, run the development server:
+## Features
+
+- Drag and drop **columns** and **tasks** (within/between columns)
+- Real-time updates via **WebSocket (Socket.IO)**
+- Task and column CRUD operations
+- Optimistic UI updates
+- Column and task reordering with previous/next references
+- REST API + WebSocket integration
+- Next.js frontend with Zustand state management
+- Notifications with **notistack**
+
+## Tech Stack
+
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS, Zustand, Dnd-Kit
+- **Backend:** Express.js, MongoDB, Mongoose, Socket.IO
+- **Realtime:** WebSocket via Socket.IO
+- **Dev Tools:** Axios, Notistack
+
+## Setup
+
+1. Clone the repository:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Bipul-Dubey/task.creativefrenzy
+cd creative-frenzy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## creative-frenzy folder structure and env
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+creative-frenzy/
+│
+├── src/                  # Source code
+│   ├── apis/             # API functions
+│   ├── app/              # Routes (using app routing)
+│   ├── components/       # Shared/common components
+│   ├── context/          # Context APIs for state management
+│   └── store/            # Zustand state
+│
+├── backend/              # Backend API with MongoDB
+│   └── .env              # Backend environment variables
+│
+└── .env                  # Root environment variables
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Requirements
+### Backend
+```bash 
+MONGO_URI=your_mongodb_connection_string
+PORT=4000
+CLIENT_ORIGIN=http://localhost:3000
+```
+### Frontend
+```bash 
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Running the Project
+### Backend
+```bash 
+cd backend
+npm install
+npm run dev
+```
+### Frontend
+```bash 
+cd creative-frenzy
+npm install
+npm run dev
+```
