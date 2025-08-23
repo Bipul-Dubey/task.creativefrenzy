@@ -10,6 +10,10 @@ import TaskModal from "./TaskModal";
 import { useBoardStore } from "@/store/board-store";
 import { useMemo } from "react";
 import { sortLinkedList } from "@/lib/utils";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 export const TaskColumn = ({
   column,
@@ -78,19 +82,24 @@ export const TaskColumn = ({
         </div>
       </div>
 
-      {tasks && tasks.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {tasks?.map((t, index) => (
-            <TaskCard
-              key={t._id}
-              task={t}
-              columnId={column._id}
-              index={index}
-              onDelete={() => onDeleteTask(t._id)}
-            />
-          ))}
-        </div>
-      )}
+      <SortableContext
+        items={tasks.map((t) => `task-${t._id}`)}
+        strategy={verticalListSortingStrategy}
+      >
+        {tasks && tasks.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {tasks.map((t, index) => (
+              <TaskCard
+                key={t._id}
+                task={t}
+                columnId={column._id}
+                index={index}
+                onDelete={() => onDeleteTask(t._id)}
+              />
+            ))}
+          </div>
+        ) : null}
+      </SortableContext>
     </div>
   );
 };

@@ -95,40 +95,48 @@ router.delete("/:id", async (req, res) => {
 });
 
 router.patch("/reorder/:id", async (req, res) => {
+  const session = await Task.startSession();
+  session.startTransaction();
+
   try {
     const io = req.app.get("io");
-
     const { prevId, nextId, columnId } = req.body;
     const taskId = req.params.id;
 
-    const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ error: "Task not found" });
+    const task = await Task.findById(taskId).session(session);
+    if (!task) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: "Task not found" });
+    }
 
-    // disconnect with old previous and next
-    if (task.prev) await Task.findByIdAndUpdate(task.prev, { next: task.next });
-    if (task.next) await Task.findByIdAndUpdate(task.next, { prev: task.prev });
+    // disconnect old neighbors
+    if (task.prev)
+      await Task.findByIdAndUpdate(task.prev, { next: task.next }, { session });
+    if (task.next)
+      await Task.findByIdAndUpdate(task.next, { prev: task.prev }, { session });
 
-    // connect to new previous and next
-    if (prevId) await Task.findByIdAndUpdate(prevId, { next: taskId });
-    if (nextId) await Task.findByIdAndUpdate(nextId, { prev: taskId });
+    // connect new neighbors
+    if (prevId)
+      await Task.findByIdAndUpdate(prevId, { next: taskId }, { session });
+    if (nextId)
+      await Task.findByIdAndUpdate(nextId, { prev: taskId }, { session });
 
-    // update the task itselft
+    // update the task itself
     task.prev = prevId || null;
     task.next = nextId || null;
-    // also update the column so if user drag and drop in another then it must update
     if (columnId) task.columnId = columnId;
-    await task.save();
+    await task.save({ session });
 
-    // send the notification
-    io.emit("task:reorder", {
-      taskId,
-      prevId,
-      nextId,
-      columnId,
-    });
+    await session.commitTransaction();
+    session.endSession();
+
+    // notify all clients
+    io.emit("task:reordered", { taskId, prevId, nextId, columnId });
 
     res.json({ success: true, task });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     res.status(500).json({ error: err.message });
   }
 });

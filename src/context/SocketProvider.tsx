@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect } from "react";
 import socket from "@/lib/socket";
 import { ServerEvents } from "@/types";
 import { useBoardStore } from "@/store/board-store";
-import { handleGetColumns } from "@/apis/tasks";
+import { handleGetColumns, handleGetTask } from "@/apis/tasks";
 
 const SocketContext = createContext(socket);
 
@@ -16,6 +16,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     setColumns,
     setPreTasks,
     deleteTask,
+    setTasks,
   } = useBoardStore();
   useEffect(() => {
     socket.on(ServerEvents.CONNECT, () => console.log("Connected:", socket.id));
@@ -59,6 +60,15 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     socket.on(ServerEvents.TASK_DELETED, (data) => {
       deleteTask(data.id);
+    });
+
+    socket.on(ServerEvents.TASK_REORDERED, (data) => {
+      (async () => {
+        const tasks = await handleGetTask();
+        if (Array.isArray(tasks.data)) {
+          setTasks(tasks.data);
+        }
+      })();
     });
 
     return () => {

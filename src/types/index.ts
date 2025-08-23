@@ -7,7 +7,7 @@ export enum ServerEvents {
   TASK_CREATED = "task:created",
   TASK_UPDATED = "task:updated",
   TASK_DELETED = "task:deleted",
-  TASK_MOVED = "task:reordered",
+  TASK_REORDERED = "task:reordered",
   COLUMN_REORDERED = "column:reordered",
 }
 

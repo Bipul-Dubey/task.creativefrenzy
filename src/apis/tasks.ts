@@ -183,3 +183,15 @@ export const handleDeleteTask = async (
     };
   }
 };
+
+export const handleReorderTask = async (
+  taskId: string,
+  data: { prevId: string | null; nextId: string | null; columnId: string }
+) => {
+  try {
+    const resp = await axios.patch(`${BASE_URL}/tasks/reorder/${taskId}`, data);
+    return { isError: false, data: resp.data };
+  } catch (error) {
+    return { isError: true, error };
+  }
+};

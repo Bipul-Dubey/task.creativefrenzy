@@ -3,32 +3,36 @@ import React, { useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
   DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { TaskColumn } from "./TaskColumn";
+import { TaskCard } from "./TaskCard";
 import { useBoardStore } from "@/store/board-store";
 import { sortLinkedList } from "@/lib/utils";
 import {
   handleDeleteColumn,
   handleDeleteTask,
   handleReorderColumn,
+  handleReorderTask,
 } from "@/apis/tasks";
-import {
-  arrayMove,
-  horizontalListSortingStrategy,
-  SortableContext,
-} from "@dnd-kit/sortable";
+import type { ITask, IColumn } from "@/types";
 
 const TaskArea = () => {
   const { columns, isColumnLoading } = useBoardStore();
-  const [activeCol, setActiveCol] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeColumn, setActiveColumn] = useState<IColumn | null>(null);
+  const [activeTask, setActiveTask] = useState<ITask | null>(null);
 
-  const shortedColumns = useMemo(() => {
+  const sortedColumns = useMemo(() => {
     return sortLinkedList(columns);
   }, [columns]);
 
@@ -44,51 +48,130 @@ const TaskArea = () => {
     handleDeleteTask(taskId);
   };
 
+  const onDragStart = (e: DragStartEvent) => {
+    const id = String(e.active.id);
+
+    if (id.startsWith("col-")) {
+      const colId = id.replace("col-", "");
+      const col = sortedColumns.find((c) => c._id === colId) || null;
+      setActiveTask(null);
+      setActiveColumn(col || null);
+      return;
+    }
+
+    if (id.startsWith("task-")) {
+      const taskId = id.replace("task-", "");
+      const currentTask =
+        useBoardStore.getState().tasks.find((t: ITask) => t._id === taskId) ||
+        null;
+      setActiveColumn(null);
+      setActiveTask(currentTask || null);
+      return;
+    }
+
+    setActiveColumn(null);
+    setActiveTask(null);
+  };
+
   const onDragEnd = async (e: DragEndEvent) => {
     const { active, over } = e;
+    setActiveColumn(null);
+    setActiveTask(null);
     if (!over) return;
-    console.log(active);
-    const findColumn = shortedColumns.find(
-      (item) => item._id === active.data?.current?.columnId
-    );
-
-    if (findColumn) {
-      setActiveCol(findColumn.title);
-    }
 
     const aId = String(active.id);
     const oId = String(over.id);
 
+    // Columns reorder
     if (aId.startsWith("col-") && oId.startsWith("col-")) {
       setIsLoading(true);
-      const { columns } = useBoardStore.getState();
-
-      const from = columns.findIndex((c) => `col-${c._id}` === aId);
-      const to = columns.findIndex((c) => `col-${c._id}` === oId);
+      const stateCols = useBoardStore.getState().columns;
+      const from = stateCols.findIndex((c) => `col-${c._id}` === aId);
+      const to = stateCols.findIndex((c) => `col-${c._id}` === oId);
 
       if (from !== -1 && to !== -1 && from !== to) {
-        const newOrder = arrayMove(columns, from, to);
+        const newOrder = arrayMove(stateCols, from, to);
         useBoardStore.setState({ columns: newOrder });
 
         const movedCol = newOrder[to];
         const prevId = to > 0 ? newOrder[to - 1]._id : null;
         const nextId = to < newOrder.length - 1 ? newOrder[to + 1]._id : null;
 
-        await handleReorderColumn(movedCol._id, { prevId, nextId });
-        setActiveCol(null);
-        setIsLoading(false);
+        try {
+          await handleReorderColumn(movedCol._id, { prevId, nextId });
+        } finally {
+          setIsLoading(false);
+        }
       }
       return;
     }
+
+    // Tasks reorder/move
+    if (aId.startsWith("task-")) {
+      const activeData = active.data.current as
+        | { type: "task"; taskId: string; columnId: string; index: number }
+        | undefined;
+      const overData = over.data.current as
+        | { type: "task"; taskId: string; columnId: string; index: number }
+        | { type: "column"; columnId: string }
+        | undefined;
+
+      const { tasks } = useBoardStore.getState();
+      const taskId = aId.replace("task-", "");
+      const draggedTask = tasks.find((t) => t._id === taskId);
+      if (!draggedTask) return;
+
+      const toColumnId = oId.startsWith("task-")
+        ? (overData as any)?.columnId
+        : oId.startsWith("col-")
+        ? oId.replace("col-", "")
+        : null;
+
+      if (!toColumnId) return;
+
+      const tasksByColumn = useBoardStore.getState().tasksByColumn;
+      const destList = sortLinkedList(tasksByColumn[toColumnId] || []);
+
+      let insertAt: number;
+      if (oId.startsWith("task-")) {
+        insertAt = (overData as any)?.index ?? 0;
+      } else {
+        insertAt = destList.length;
+      }
+
+      const simulatedDest = [...destList];
+      // If moving within same column, remove its old position first
+      if (draggedTask.columnId === toColumnId) {
+        const oldIdx = simulatedDest.findIndex((t) => t._id === taskId);
+        if (oldIdx > -1) simulatedDest.splice(oldIdx, 1);
+      }
+      const clamped = Math.max(0, Math.min(insertAt, simulatedDest.length));
+      simulatedDest.splice(clamped, 0, {
+        ...draggedTask,
+        columnId: toColumnId,
+      });
+
+      const prevId = clamped > 0 ? simulatedDest[clamped - 1]._id : null;
+      const nextId =
+        clamped < simulatedDest.length - 1
+          ? simulatedDest[clamped + 1]._id
+          : null;
+
+      await handleReorderTask(taskId, {
+        prevId,
+        nextId,
+        columnId: toColumnId,
+      });
+    }
   };
 
-  if (isColumnLoading && shortedColumns.length === 0) {
+  if (isColumnLoading && sortedColumns.length === 0) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="flex flex-col flex-1">
-      {shortedColumns.length === 0 && (
+      {sortedColumns.length === 0 && (
         <div className="w-full flex flex-col items-center space-y-2">
           <h3 className="text-2xl font-bold">No Column available</h3>
           <p className="text-gray-500">
@@ -96,18 +179,23 @@ const TaskArea = () => {
           </p>
         </div>
       )}
-      {isLoading ? <div> Reordering... </div> : null}
+      {isLoading ? <div>Reordering...</div> : null}
+
       <DndContext
         sensors={sensors}
+        onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        onDragCancel={() => setActiveCol(null)}
+        onDragCancel={() => {
+          setActiveColumn(null);
+          setActiveTask(null);
+        }}
       >
         <SortableContext
-          items={shortedColumns.map((c) => `col-${c._id}`)}
+          items={sortedColumns.map((c) => `col-${c._id}`)}
           strategy={horizontalListSortingStrategy}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {shortedColumns.map((col) => (
+            {sortedColumns.map((col) => (
               <TaskColumn
                 key={col._id}
                 column={col}
@@ -117,15 +205,24 @@ const TaskArea = () => {
             ))}
           </div>
         </SortableContext>
+
         <DragOverlay>
-          {activeCol ? (
+          {activeColumn ? (
             <TaskColumn
-              column={shortedColumns.find((c) => `col-${c._id}` === activeCol)!}
+              column={activeColumn}
               onDelete={() => {}}
               onDeleteTask={() => {}}
             />
+          ) : activeTask ? (
+            <TaskCard
+              task={activeTask}
+              columnId={activeTask.columnId}
+              index={0}
+              onDelete={() => {}}
+              dragPreview
+            />
           ) : null}
-        </DragOverlay>{" "}
+        </DragOverlay>
       </DndContext>
     </div>
   );
