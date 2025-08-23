@@ -18,7 +18,8 @@ app.use("/tasks", taskRoutes);
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: process.env.CLIENT_ORIGIN, credentials: false },
+  cors: { origin: process.env.CLIENT_ORIGIN || "*", credentials: false },
+  transports: ["websocket"],
 });
 
 app.set("io", io);

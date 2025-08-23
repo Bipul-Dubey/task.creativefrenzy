@@ -4,20 +4,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { IUserRegisterPayload } from "@/types";
+import { handleRegister } from "@/apis/user";
+import { useRouter } from "next/navigation";
+import { useSnackbar } from "notistack";
 
-const LoginPage: React.FC = () => {
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+const RegisterPage: React.FC = () => {
+  const { enqueueSnackbar } = useSnackbar();
+
+  const [form, setForm] = useState<IUserRegisterPayload>({
+    fullName: "",
+    email: "",
+    password: "",
+  });
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
   const onSubmit = async () => {
-    if (!form.email || !form.password || !form.name) {
+    if (!form.email || !form.password || !form.fullName) {
+      enqueueSnackbar("Please fill all information", {
+        variant: "warning",
+      });
       return;
     }
 
     setSubmitting(true);
     try {
-      await new Promise((r) => setTimeout(r, 800));
+      const resp = await handleRegister(form);
+      if (!resp.isError) {
+        enqueueSnackbar("Register Success, Login to continue", {
+          variant: "success",
+        });
+        router.push("/");
+      }
     } catch (err: any) {
+      enqueueSnackbar(err.message ?? "Something went wrong, try again!", {
+        variant: "error",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -30,16 +53,16 @@ const LoginPage: React.FC = () => {
           Enter your details to continue
         </h1>
 
-        <div onSubmit={onSubmit} className="space-y-5">
+        <div className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name">Full Name</Label>
             <Input
               id="name"
               type="text"
               placeholder="Bipul Dubey"
-              value={form.email}
+              value={form.fullName}
               onChange={(e) => {
-                setForm({ ...form, name: e.target.value });
+                setForm({ ...form, fullName: e.target.value });
               }}
               required
               autoComplete="email"
@@ -91,4 +114,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export default RegisterPage;

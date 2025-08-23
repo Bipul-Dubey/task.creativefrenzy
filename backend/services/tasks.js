@@ -4,6 +4,7 @@ const Task = require("../models/tasks.js");
 
 router.get("/", async (req, res) => {
   try {
+    // const columnId = req.params.columnId;
     const tasks = await Task.find();
     res.json(tasks);
   } catch (err) {
@@ -27,11 +28,29 @@ router.post("/", async (req, res) => {
 
     await task.save();
 
-    if (prevId) await Task.findByIdAndUpdate(prevId, { next: task._id });
-    if (nextId) await Task.findByIdAndUpdate(nextId, { prev: task._id });
+    if (prevId) {
+      await Task.findByIdAndUpdate(prevId, { next: task._id });
+    }
+    if (nextId) {
+      await Task.findByIdAndUpdate(nextId, { prev: task._id });
+    }
 
-    io.emit("task:created", task);
-    res.json(task);
+    const updatedNeighbors = await Task.find({
+      _id: { $in: [prevId, nextId].filter(Boolean) },
+    });
+
+    const updatedTask = await Task.findById(task._id);
+
+    io.emit("task:created", {
+      task: updatedTask,
+      updatedNeighbors,
+    });
+
+    res.json({
+      success: true,
+      task: updatedTask,
+      updatedNeighbors,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -68,7 +87,7 @@ router.delete("/:id", async (req, res) => {
 
     await task.deleteOne();
 
-    io.emit("column:deleted", { id });
+    io.emit("task:deleted", { id });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

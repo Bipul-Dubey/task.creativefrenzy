@@ -24,11 +24,29 @@ router.post("/", async (req, res) => {
     });
     await column.save();
 
-    if (prevId) await Column.findByIdAndUpdate(prevId, { next: column._id });
-    if (nextId) await Column.findByIdAndUpdate(nextId, { prev: column._id });
+    const updateOps = [];
 
-    io.emit("column:created", column);
-    res.json(column);
+    if (prevId) {
+      updateOps.push(
+        Column.findByIdAndUpdate(prevId, { next: column._id }, { new: true })
+      );
+    }
+    if (nextId) {
+      updateOps.push(
+        Column.findByIdAndUpdate(nextId, { prev: column._id }, { new: true })
+      );
+    }
+
+    const updatedNeighbors = await Promise.all(updateOps);
+    const updatedColumn = await Column.findById(column._id);
+
+    const payload = {
+      column: updatedColumn,
+      updatedNeighbors: updatedNeighbors.filter(Boolean),
+    };
+
+    io.emit("column:created", payload);
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -60,12 +78,34 @@ router.delete("/:id", async (req, res) => {
     const col = await Column.findById(id);
     if (!col) return res.status(404).json({ error: "Column not found" });
 
-    if (col.prev) await Column.findByIdAndUpdate(col.prev, { next: col.next });
-    if (col.next) await Column.findByIdAndUpdate(col.next, { prev: col.prev });
+    let updatedNeighbors = [];
+
+    if (col.prev) {
+      const updatedPrev = await Column.findByIdAndUpdate(
+        col.prev,
+        { next: col.next },
+        { new: true }
+      );
+      if (updatedPrev) updatedNeighbors.push(updatedPrev);
+    }
+
+    if (col.next) {
+      const updatedNext = await Column.findByIdAndUpdate(
+        col.next,
+        { prev: col.prev },
+        { new: true }
+      );
+      if (updatedNext) updatedNeighbors.push(updatedNext);
+    }
 
     await col.deleteOne();
-    io.emit("column:deleted", { id });
-    res.json({ success: true });
+
+    io.emit("column:deleted", {
+      id,
+      updatedNeighbors,
+    });
+
+    res.json({ success: true, id, updatedNeighbors });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -81,29 +121,45 @@ router.patch("/reorder/:id", async (req, res) => {
     const column = await Column.findById(columnId);
     if (!column) return res.status(404).json({ error: "Column not found" });
 
-    // disconnect with older previous and next
-    if (column.prev)
+    // 1. Disconnect from old neighbors
+    if (column.prev) {
       await Column.findByIdAndUpdate(column.prev, { next: column.next });
-    if (column.next)
+    }
+    if (column.next) {
       await Column.findByIdAndUpdate(column.next, { prev: column.prev });
+    }
 
-    // connect to new previous and next
-    if (prevId) await Column.findByIdAndUpdate(prevId, { next: columnId });
-    if (nextId) await Column.findByIdAndUpdate(nextId, { prev: columnId });
+    // 2. Connect to new neighbors
+    if (prevId) {
+      await Column.findByIdAndUpdate(prevId, { next: columnId });
+    }
+    if (nextId) {
+      await Column.findByIdAndUpdate(nextId, { prev: columnId });
+    }
 
-    // update current column previous and next
+    // 3. Update the current column itself
     column.prev = prevId || null;
     column.next = nextId || null;
     await column.save();
 
-    // emit the event to notify others
-    io.emit("column:reorder", {
-      columnId,
-      prevId,
-      nextId,
+    // 4. Fetch updated neighbors for frontend
+    const updatedNeighbors = await Column.find({
+      _id: { $in: [prevId, nextId].filter(Boolean) },
     });
 
-    res.json({ success: true, column });
+    const updatedColumn = await Column.findById(columnId);
+
+    // 5. Emit event after all updates are guaranteed done
+    io.emit("column:reordered", {
+      column: updatedColumn,
+      updatedNeighbors,
+    });
+
+    res.json({
+      success: true,
+      column: updatedColumn,
+      updatedNeighbors,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

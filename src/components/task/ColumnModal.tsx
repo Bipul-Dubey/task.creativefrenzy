@@ -14,31 +14,54 @@ import { Input } from "@/components/ui/input";
 import { Plus, Pencil } from "lucide-react";
 import { Label } from "../ui/label";
 import { useBoardStore } from "@/store/board-store";
+import { handleCreateColumn, handleUpdateColumn } from "@/apis/tasks";
+import { useSnackbar } from "notistack";
+import { sortLinkedList } from "@/lib/utils";
 
 type ColumnModalProps = {
   mode: "add" | "edit";
   initialTitle?: string;
+  columnId?: string;
 };
 
 const ColumnModal: React.FC<ColumnModalProps> = ({
   mode,
   initialTitle = "",
+  columnId = "",
 }) => {
   const [open, setOpen] = useState(false);
   const [isLoading] = useState(false);
   const [title, setTitle] = useState(initialTitle);
-  const { addColumn } = useBoardStore();
+  const { enqueueSnackbar } = useSnackbar();
+  const { columns } = useBoardStore();
 
   useEffect(() => {
     if (open && initialTitle) setTitle(initialTitle);
   }, [open, initialTitle]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim() || isLoading) return;
-    addColumn({
-      title: title.trim(),
-      tasks: [],
-    });
+    if (mode === "add") {
+      const prevId =
+        columns.length > 0 ? sortLinkedList(columns).at(-1)?._id ?? null : null;
+      const resp = await handleCreateColumn({
+        title: title.trim(),
+        prevId,
+        nextId: null,
+      });
+      if (resp.isError) {
+        enqueueSnackbar("Something went wront, try again", {
+          variant: "error",
+        });
+        return;
+      }
+      enqueueSnackbar("New Column created successfully", {
+        variant: "info",
+      });
+    } else {
+      handleUpdateColumn(columnId, title);
+    }
+
     setTitle("");
     setOpen(false);
   };

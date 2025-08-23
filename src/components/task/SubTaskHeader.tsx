@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 const SubTaskHeader = () => {
   return (
     <div className="flex items-center justify-between">
-      <div>Sort</div>
       <div className="*:data-[slot=avatar]:ring-background flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:grayscale">
         <Avatar>
           <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />

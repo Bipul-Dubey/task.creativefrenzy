@@ -10,7 +10,6 @@ const TaskHeader = () => {
       <h3 className="text-lg font-bold">Task Manager</h3>
       <div className="flex gap-3 flex-wrap">
         <ColumnModal mode="add" />
-        <TaskModal mode="add" />
       </div>
     </div>
   );

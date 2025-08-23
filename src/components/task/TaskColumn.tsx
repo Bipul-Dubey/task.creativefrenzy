@@ -1,26 +1,23 @@
 "use client";
-import { TColumn } from "@/types";
+import { IColumn, ITask } from "@/types";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "../ui/button";
 import { GripVertical, Trash2 } from "lucide-react";
-import { TaskList } from "./TaskList";
+import { TaskCard } from "./TaskCard";
 import ColumnModal from "./ColumnModal";
 import TaskModal from "./TaskModal";
+import { useBoardStore } from "@/store/board-store";
+import { useMemo } from "react";
+import { sortLinkedList } from "@/lib/utils";
 
 export const TaskColumn = ({
   column,
-  onRename,
   onDelete,
-  onAddTask,
-  onEditTask,
   onDeleteTask,
 }: {
-  column: TColumn;
-  onRename: (title: string) => void;
+  column: IColumn;
   onDelete: () => void;
-  onAddTask: (title: string) => void;
-  onEditTask: (taskId: string, title: string) => void;
   onDeleteTask: (taskId: string) => void;
 }) => {
   const {
@@ -31,10 +28,21 @@ export const TaskColumn = ({
     transition,
     isDragging,
   } = useSortable({
-    id: `col-${column.id}`,
-    data: { type: "column", columnId: column.id },
+    id: `col-${column._id}`,
+    data: { type: "column", columnId: column._id },
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const { tasksByColumn } = useBoardStore();
+
+  const tasks: ITask[] = useMemo(() => {
+    if (Object.keys(tasksByColumn).length > 0) {
+      if (Array.isArray(tasksByColumn[column._id])) {
+        return sortLinkedList(tasksByColumn[column._id]);
+      }
+      return [];
+    }
+    return [];
+  }, [tasksByColumn]);
 
   return (
     <div
@@ -57,8 +65,12 @@ export const TaskColumn = ({
           <h4 className="text-lg font-bold">{column.title}</h4>
         </div>
         <div className="flex items-center gap-1">
-          <TaskModal mode="add" variant={"icon"} />
-          <ColumnModal mode="edit" initialTitle={column.title} />
+          <TaskModal mode="add" variant={"icon"} columnId={column._id} />
+          <ColumnModal
+            mode="edit"
+            initialTitle={column.title}
+            columnId={column._id}
+          />
 
           <Button size="icon" variant="ghost" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
@@ -66,16 +78,15 @@ export const TaskColumn = ({
         </div>
       </div>
 
-      {column?.tasks && column.tasks.length > 0 && (
+      {tasks && tasks.length > 0 && (
         <div className="flex flex-col gap-2">
-          {column?.tasks?.map((t, index) => (
-            <TaskList
-              key={t.id}
+          {tasks?.map((t, index) => (
+            <TaskCard
+              key={t._id}
               task={t}
-              columnId={column.id}
+              columnId={column._id}
               index={index}
-              onEditTitle={(title) => onEditTask(t.id, title)}
-              onDelete={() => onDeleteTask(t.id)}
+              onDelete={() => onDeleteTask(t._id)}
             />
           ))}
         </div>

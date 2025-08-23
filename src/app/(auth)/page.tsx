@@ -4,20 +4,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { IUserLoginPayload } from "@/types";
+import { useSnackbar } from "notistack";
+import { handleLogin } from "@/apis/user";
 
 const LoginPage: React.FC = () => {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState<IUserLoginPayload>({
+    email: "",
+    password: "",
+  });
   const [submitting, setSubmitting] = useState(false);
+  const { enqueueSnackbar } = useSnackbar();
+
+  const router = useRouter();
 
   const onSubmit = async () => {
     if (!form.email || !form.password) {
+      enqueueSnackbar("Please fill all information", {
+        variant: "warning",
+      });
       return;
     }
 
     setSubmitting(true);
     try {
-      await new Promise((r) => setTimeout(r, 800));
+      const resp = await handleLogin(form);
+      if (!resp.isError) {
+        localStorage.setItem("login", JSON.stringify(resp.data));
+        enqueueSnackbar("Login Success", {
+          variant: "success",
+        });
+        router.push("/task");
+      }
     } catch (err: any) {
+      enqueueSnackbar(err.message ?? "Something went wrong, try again!", {
+        variant: "error",
+      });
     } finally {
       setSubmitting(false);
     }
